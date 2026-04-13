@@ -12,13 +12,19 @@ public class GenderizeService {
 
     public Map<String, Object> classifyName(String name) {
 
-        String cleanName = name.trim().toLowerCase();
+        RestTemplate restTemplate = new RestTemplate();
 
+        String cleanName = name.trim().toLowerCase();
         String url = "https://api.genderize.io?name=" + cleanName;
+
         Map<String, Object> response = restTemplate.getForObject(url, Map.class);
 
+        // ✅ Handle null response safely
         if (response == null) {
-            return Map.of();
+            return Map.of(
+                    "name", cleanName,
+                    "gender", null
+            );
         }
 
         String gender = (String) response.get("gender");
@@ -31,7 +37,15 @@ public class GenderizeService {
                 ? Integer.parseInt(response.get("count").toString())
                 : 0;
 
-        // ✅ REQUIRED confidence logic (string, not boolean)
+        // ✅ If gender is null, return early (prevents 500 error)
+        if (gender == null) {
+            return Map.of(
+                    "name", cleanName,
+                    "gender", null
+            );
+        }
+
+        // ✅ Confidence logic (REQUIRED FORMAT)
         String confidence;
         if (probability >= 0.75) {
             confidence = "high";
