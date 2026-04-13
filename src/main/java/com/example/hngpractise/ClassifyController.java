@@ -1,37 +1,43 @@
 package com.example.hngpractise;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/api")
-@CrossOrigin(origins = "*")  // ✅ Fixes CORS issue
+@CrossOrigin(origins = "*")
 public class ClassifyController {
 
     @Autowired
     private GenderizeService genderizeService;
 
     @GetMapping("/classify")
-    public ResponseEntity<?> classify(@RequestParam(required = false) String name) {
-
+    public ResponseEntity<Map<String, Object>> classify(@RequestParam(required = false) String name) {
         if (name == null || name.trim().isEmpty()) {
-            return ResponseEntity.status(400).body(Map.of(
-                    "error", "Name parameter is required"
-            ));
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("status", "error");
+            errorResponse.put("message", "Name parameter is required");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
         }
 
         Map<String, Object> data = genderizeService.classifyName(name.trim());
 
-        // ✅ THIS HANDLES nonsense names
-        if (data.get("gender") == null) {
-            return ResponseEntity.status(422).body(Map.of(
-                    "error", "Unable to determine gender"
-            ));
+        if (data == null || data.get("gender") == null) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("status", "error");
+            errorResponse.put("message", "Unable to determine gender");
+            return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(errorResponse);
         }
 
-        return ResponseEntity.ok(data);
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "success");
+        response.put("data", data);
+
+        return ResponseEntity.ok(response);
     }
 }

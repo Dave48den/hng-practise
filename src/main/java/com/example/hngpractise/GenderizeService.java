@@ -3,6 +3,8 @@ package com.example.hngpractise;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import java.time.Instant;
+import java.util.HashMap;
 import java.util.Map;
 
 @Service
@@ -11,65 +13,33 @@ public class GenderizeService {
     private final RestTemplate restTemplate = new RestTemplate();
 
     public Map<String, Object> classifyName(String name) {
+        String cleanName = name.trim().toLowerCase();
+        String url = "https://api.genderize.io?name=" + cleanName;
 
-        try {
-            RestTemplate restTemplate = new RestTemplate();
+        Map<String, Object> response = restTemplate.getForObject(url, Map.class);
 
-            String cleanName = name.trim().toLowerCase();
-            String url = "https://api.genderize.io?name=" + cleanName;
-
-            Map<String, Object> response = restTemplate.getForObject(url, Map.class);
-
-            // ✅ If API fails or returns null
-            if (response == null) {
-                return Map.of(
-                        "name", cleanName,
-                        "gender", null
-                );
-            }
-
-            String gender = (String) response.get("gender");
-
-            // ✅ If gender is null → STOP here (no crash)
-            if (gender == null) {
-                return Map.of(
-                        "name", cleanName,
-                        "gender", null
-                );
-            }
-
-            Double probability = response.get("probability") != null
-                    ? Double.parseDouble(response.get("probability").toString())
-                    : 0.0;
-
-            Integer count = response.get("count") != null
-                    ? Integer.parseInt(response.get("count").toString())
-                    : 0;
-
-            String confidence;
-            if (probability >= 0.75) {
-                confidence = "high";
-            } else if (probability >= 0.5) {
-                confidence = "medium";
-            } else {
-                confidence = "low";
-            }
-
-            return Map.of(
-                    "name", cleanName,
-                    "gender", gender,
-                    "probability", probability,
-                    "count", count,
-                    "confidence", confidence
-            );
-
-        } catch (Exception e) {
-            // ✅ THIS PREVENTS 500 ERRORS COMPLETELY
-            return Map.of(
-                    "name", name,
-                    "gender", null
-            );
+        if (response == null) {
+            return null;
         }
+
+        String gender = (String) response.get("gender");
+        Double probability = response.get("probability") != null
+                ? Double.parseDouble(response.get("probability").toString())
+                : 0.0;
+        Integer sampleSize = response.get("count") != null
+                ? Integer.parseInt(response.get("count").toString())
+                : 0;
+
+        boolean isConfident = probability >= 0.8 && sampleSize > 100;
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("name", cleanName);
+        result.put("gender", gender);
+        result.put("probability", probability);
+        result.put("sample_size", sampleSize);
+        result.put("is_confident", isConfident);
+        result.put("processed_at", Instant.now().toString());
+
+        return result;
     }
 }
-
