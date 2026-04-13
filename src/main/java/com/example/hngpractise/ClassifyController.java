@@ -25,13 +25,13 @@ public class ClassifyController {
 
         Map<String, Object> data = genderizeService.classifyName(name.trim());
 
-        // Handle unknown / nonsense names
+        // ✅ THIS HANDLES nonsense names
         if (data.get("gender") == null) {
             return ResponseEntity.status(422).body(Map.of(
                     "error", "Unable to determine gender"
             ));
         }
 
-        return ResponseEntity.ok(data); // ✅ return directly (NO wrapper)
+        return ResponseEntity.ok(data);
     }
 }
