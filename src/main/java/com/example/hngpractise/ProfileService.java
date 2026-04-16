@@ -5,112 +5,88 @@ import org.springframework.web.client.RestTemplate;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
 @Service
 public class ProfileService {
 
-    private final ProfileRepository repository;
+    private final ProfileRepository profileRepository;
     private final RestTemplate restTemplate = new RestTemplate();
 
-    public ProfileService(ProfileRepository repository) {
-        this.repository = repository;
+    public ProfileService(ProfileRepository profileRepository) {
+        this.profileRepository = profileRepository;
     }
 
-    public Object createProfile(String name) {
-
-        // 1. VALIDATION
-        if (name == null || name.trim().isEmpty()) {
-            return error("Missing or empty name", 400);
-        }
-
-        String cleanName = name.toLowerCase();
-
-        // 2. IDEMPOTENCY CHECK
-        Optional<Profile> existing = repository.findByName(cleanName);
+    public Profile createProfile(String name) {
+        // Idempotency check
+        Optional<Profile> existing = profileRepository.findByNameIgnoreCase(name);
         if (existing.isPresent()) {
-            return Map.of(
-                    "status", "success",
-                    "message", "Profile already exists",
-                    "data", existing.get()
-            );
+            return existing.get();
         }
 
-        try {
-            // 3. CALL EXTERNAL APIS
-            Map genderData = restTemplate.getForObject(
-                    "https://api.genderize.io?name=" + cleanName, Map.class);
+        // Call external APIs
+        GenderizeResponse genderData = restTemplate.getForObject(
+                "https://api.genderize.io?name=" + name, GenderizeResponse.class);
 
-            Map ageData = restTemplate.getForObject(
-                    "https://api.agify.io?name=" + cleanName, Map.class);
+        AgifyResponse ageData = restTemplate.getForObject(
+                "https://api.agify.io?name=" + name, AgifyResponse.class);
 
-            Map nationalData = restTemplate.getForObject(
-                    "https://api.nationalize.io?name=" + cleanName, Map.class);
+        NationalizeResponse nationalityData = restTemplate.getForObject(
+                "https://api.nationalize.io?name=" + name, NationalizeResponse.class);
 
-            // 4. EDGE CASE VALIDATION
-            if (genderData == null || genderData.get("gender") == null) {
-                return error("Invalid gender data", 502);
-            }
-
-            if (ageData == null || ageData.get("age") == null) {
-                return error("Invalid age data", 502);
-            }
-
-            if (nationalData == null || nationalData.get("country") == null) {
-                return error("Invalid country data", 502);
-            }
-
-            // 5. EXTRACT DATA
-            String gender = (String) genderData.get("gender");
-            double genderProbability = ((Number) genderData.get("probability")).doubleValue();
-            int sampleSize = ((Number) genderData.get("count")).intValue();
-
-            int age = ((Number) ageData.get("age")).intValue();
-
-            List countries = (List) nationalData.get("country");
-            Map topCountry = (Map) countries.get(0);
-
-            String countryId = (String) topCountry.get("country_id");
-            double countryProbability = ((Number) topCountry.get("probability")).doubleValue();
-
-            // 6. AGE GROUP LOGIC
-            String ageGroup =
-                    (age <= 12) ? "child" :
-                            (age <= 19) ? "teenager" :
-                                    (age <= 59) ? "adult" : "senior";
-
-            // 7. CREATE ENTITY
-            Profile profile = new Profile();
-            profile.setId(UUID.randomUUID().toString());
-            profile.setName(cleanName);
-            profile.setGender(gender);
-            profile.setGenderProbability(genderProbability);
-            profile.setSampleSize(sampleSize);
-            profile.setAge(age);
-            profile.setAgeGroup(ageGroup);
-            profile.setCountryId(countryId);
-            profile.setCountryProbability(countryProbability);
-            profile.setCreatedAt(Instant.now().toString());
-
-            repository.save(profile);
-
-            // 8. RESPONSE (STRICT FORMAT)
-            return Map.of(
-                    "status", "success",
-                    "data", profile
-            );
-
-        } catch (Exception e) {
-            return error("External API failure", 502);
+        // Edge case checks
+        if (genderData == null || genderData.getGender() == null || genderData.getCount() == 0) {
+            throw new ExternalApiException("Genderize returned an invalid response");
         }
+        if (ageData == null || ageData.getAge() == null) {
+            throw new ExternalApiException("Agify returned an invalid response");
+        }
+        if (nationalityData == null || nationalityData.getCountry() == null || nationalityData.getCountry().isEmpty()) {
+            throw new ExternalApiException("Nationalize returned an invalid response");
+        }
+
+        // Classification logic
+        String ageGroup = classifyAge(ageData.getAge());
+        NationalizeResponse.Country topCountry = nationalityData.getTopCountry();
+
+        // Build Profile
+        Profile profile = new Profile();
+        profile.setId(UUID.randomUUID()); // swap with UUID v7 later
+        profile.setName(name);
+        profile.setGender(genderData.getGender());
+        profile.setGenderProbability(genderData.getProbability());
+        profile.setSampleSize(genderData.getCount());
+        profile.setAge(ageData.getAge());
+        profile.setAgeGroup(ageGroup);
+        profile.setCountryId(topCountry.getCountry_id());
+        profile.setCountryProbability(topCountry.getProbability());
+        profile.setCreatedAt(Instant.now());
+
+        // Save to DB
+        return profileRepository.save(profile);
     }
 
-    private Map error(String message, int code) {
-        return Map.of(
-                "status", "error",
-                "message", message
-        );
+    public Profile getProfileById(UUID id) {
+        return profileRepository.findById(id)
+                .orElseThrow(() -> new ExternalApiException("Profile not found"));
+    }
+
+    public List<Profile> getAllProfiles() {
+        return profileRepository.findAll();
+    }
+
+    public void deleteProfile(UUID id) {
+        if (!profileRepository.existsById(id)) {
+            throw new ExternalApiException("Profile not found");
+        }
+        profileRepository.deleteById(id);
+    }
+
+    private String classifyAge(int age) {
+        if (age <= 12) return "child";
+        else if (age <= 19) return "teenager";
+        else if (age <= 59) return "adult";
+        else return "senior";
     }
 }

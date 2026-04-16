@@ -1,42 +1,32 @@
 package com.example.hngpractise;
 
-import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+
+import java.time.Instant;
+import java.util.UUID;
 
 @Entity
-@Table(name = "profiles")
 public class Profile {
 
     @Id
-    private String id;
-
-    @Column(unique = true, nullable = false)
+    private UUID id;
     private String name;
-
     private String gender;
     private Double genderProbability;
-
     private Integer sampleSize;
-
     private Integer age;
     private String ageGroup;
-
     private String countryId;
     private Double countryProbability;
+    private Instant createdAt;
 
-    private String createdAt; // UTC ISO 8601
-
-    public Profile() {
-    }
-
-    // getters and setters
-    public String getId() {
+    // Getters and setters
+    public UUID getId() {
         return id;
     }
 
-    public void setId(String id) {
+    public void setId(UUID id) {
         this.id = id;
     }
 
@@ -104,11 +94,11 @@ public class Profile {
         this.countryProbability = countryProbability;
     }
 
-    public String getCreatedAt() {
+    public Instant getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(String createdAt) {
+    public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
     }
 }

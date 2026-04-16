@@ -1,4 +1,3 @@
-
 package com.example.hngpractise;
 
 import org.springframework.boot.SpringApplication;
