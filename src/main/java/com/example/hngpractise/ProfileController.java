@@ -4,6 +4,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -27,6 +28,27 @@ public class ProfileController {
     @GetMapping("/profiles")
     public ResponseEntity<List<Profile>> getAllProfiles() {
         return ResponseEntity.ok(profileService.getAllProfiles());
+    }
+
+    // Classify profile with validation
+    @GetMapping("/profile-classify")
+    public ResponseEntity<?> classify(@RequestParam String name) {
+        // validation: reject empty or nonsense input
+        if (name == null || name.trim().isEmpty() || !name.matches("[a-zA-Z]+")) {
+            return ResponseEntity.badRequest().body(
+                    Map.of("status", "error", "message", "Invalid name")
+            );
+        }
+
+        // create and classify profile
+        Profile profile = profileService.createProfile(name);
+
+        return ResponseEntity.ok(
+                Map.of(
+                        "status", "success",
+                        "data", profile
+                )
+        );
     }
 
     // Get profile by ID
