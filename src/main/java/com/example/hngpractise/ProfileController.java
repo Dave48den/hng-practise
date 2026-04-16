@@ -5,7 +5,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/api")
@@ -17,50 +16,59 @@ public class ProfileController {
         this.profileService = profileService;
     }
 
-    // Create profile (POST /api/profiles?name=John)
+    // Create a new profile
     @PostMapping("/profiles")
-    public ResponseEntity<Profile> createProfile(@RequestParam String name) {
-        Profile profile = profileService.createProfile(name);
-        return ResponseEntity.ok(profile);
-    }
-
-    // Get all profiles
-    @GetMapping("/profiles")
-    public ResponseEntity<List<Profile>> getAllProfiles() {
-        return ResponseEntity.ok(profileService.getAllProfiles());
-    }
-
-    // Classify profile with validation
-    @GetMapping("/profile-classify")
-    public ResponseEntity<?> classify(@RequestParam String name) {
-        // validation: reject empty or nonsense input
+    public ResponseEntity<?> createProfile(@RequestParam String name) {
         if (name == null || name.trim().isEmpty() || !name.matches("[a-zA-Z]+")) {
             return ResponseEntity.badRequest().body(
                     Map.of("status", "error", "message", "Invalid name")
             );
         }
 
-        // create and classify profile
-        Profile profile = profileService.createProfile(name);
+        try {
+            Profile profile = profileService.createProfile(name);
+            return ResponseEntity.ok(
+                    Map.of("status", "success", "data", profile)
+            );
+        } catch (Exception e) {
+            return ResponseEntity.status(502).body(
+                    Map.of("status", "error", "message", "Failed to create profile")
+            );
+        }
+    }
 
+    // Get all profiles
+    @GetMapping("/profiles")
+    public ResponseEntity<?> getAllProfiles() {
+        List<Profile> profiles = profileService.getAllProfiles();
         return ResponseEntity.ok(
-                Map.of(
-                        "status", "success",
-                        "data", profile
-                )
+                Map.of("status", "success", "data", profiles)
         );
     }
 
-    // Get profile by ID
-    @GetMapping("/profiles/{id}")
-    public ResponseEntity<Profile> getProfileById(@PathVariable UUID id) {
-        return ResponseEntity.ok(profileService.getProfileById(id));
-    }
+    // Classify profile by name (gender)
+    @GetMapping("/profile-classify")
+    public ResponseEntity<?> classify(@RequestParam String name) {
+        // Step 1: Validate input
+        if (name == null || name.trim().isEmpty() || !name.matches("[a-zA-Z]+")) {
+            return ResponseEntity.badRequest().body(
+                    Map.of("status", "error", "message", "Invalid name")
+            );
+        }
 
-    // Delete profile by ID
-    @DeleteMapping("/profiles/{id}")
-    public ResponseEntity<Void> deleteProfile(@PathVariable UUID id) {
-        profileService.deleteProfile(id);
-        return ResponseEntity.noContent().build();
+        try {
+            // Step 2: Call service
+            Profile profile = profileService.createProfile(name);
+
+            // Step 3: Return success
+            return ResponseEntity.ok(
+                    Map.of("status", "success", "data", profile)
+            );
+        } catch (Exception e) {
+            // Step 4: Catch Genderize failure
+            return ResponseEntity.status(502).body(
+                    Map.of("status", "error", "message", "Genderize returned an invalid response")
+            );
+        }
     }
 }
