@@ -2,21 +2,38 @@ package com.example.hngpractise;
 
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 
 @Service
 public class ProfileService {
 
     private final ProfileRepository profileRepository;
     private final GenderizeClient genderizeClient;
+    private final AgifyClient agifyClient;
+    private final NationalizeClient nationalizeClient;
 
-    public ProfileService(ProfileRepository profileRepository, GenderizeClient genderizeClient) {
+    public ProfileService(ProfileRepository profileRepository,
+                          GenderizeClient genderizeClient,
+                          AgifyClient agifyClient,
+                          NationalizeClient nationalizeClient) {
         this.profileRepository = profileRepository;
         this.genderizeClient = genderizeClient;
+        this.agifyClient = agifyClient;
+        this.nationalizeClient = nationalizeClient;
     }
 
     public Profile createProfile(String name) {
+        Optional<Profile> existing = profileRepository.findByNameIgnoreCase(name);
+        if (existing.isPresent()) {
+            return existing.get();
+        }
+
         Profile profile = classifyProfile(name);
+        profile.setId(UUID.randomUUID()); // UUID v7 ideally, but randomUUID works
+        profile.setCreatedAt(Instant.now());
         return profileRepository.save(profile);
     }
 
@@ -24,23 +41,51 @@ public class ProfileService {
         return profileRepository.findAll();
     }
 
-    public Profile classifyProfile(String name) {
-        try {
-            Profile profile = genderizeClient.classify(name);
-
-            // Fallback: if probability is too low, mark as unknown
-            if (profile.getGenderProbability() == null || profile.getGenderProbability() < 0.5) {
-                profile.setGender("unknown");
-            }
-
-            return profile;
-        } catch (Exception e) {
-            // Fallback if Genderize completely fails
-            Profile fallback = new Profile();
-            fallback.setName(name);
-            fallback.setGender("unknown");
-            return fallback;
-        }
+    public Profile getProfileById(UUID id) {
+        return profileRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Profile not found"));
     }
 
+    public void deleteProfile(UUID id) {
+        profileRepository.deleteById(id);
+    }
+
+    public Profile classifyProfile(String name) {
+        Profile profile = new Profile();
+        profile.setName(name);
+
+        // Genderize
+        GenderizeResponse g = genderizeClient.classify(name);
+        if (g == null || g.getGender() == null || g.getCount() == 0) {
+            throw new ExternalApiException("Genderize returned an invalid response");
+        }
+        profile.setGender(g.getGender());
+        profile.setGenderProbability(g.getProbability());
+        profile.setSampleSize(g.getCount());
+
+        // Agify
+        AgifyResponse a = agifyClient.classify(name);
+        if (a == null || a.getAge() == null) {
+            throw new ExternalApiException("Agify returned an invalid response");
+        }
+        profile.setAge(a.getAge());
+        profile.setAgeGroup(getAgeGroup(a.getAge()));
+
+        // Nationalize
+        NationalizeResponse n = nationalizeClient.classify(name);
+        if (n == null || n.getTopCountry() == null) {
+            throw new ExternalApiException("Nationalize returned an invalid response");
+        }
+        profile.setCountryId(n.getTopCountry().getCountry_id());
+        profile.setCountryProbability(n.getTopCountry().getProbability());
+
+        return profile;
+    }
+
+    private String getAgeGroup(int age) {
+        if (age <= 12) return "child";
+        if (age <= 19) return "teenager";
+        if (age <= 59) return "adult";
+        return "senior";
+    }
 }

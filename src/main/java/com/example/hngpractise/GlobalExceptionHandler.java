@@ -29,7 +29,13 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleGeneric(Exception ex) {
-        return buildErrorResponse(HttpStatus.UNPROCESSABLE_ENTITY, "Unexpected error occurred");
+
+        ex.printStackTrace(); // 👈 IMPORTANT: shows real error in terminal
+
+        return buildErrorResponse(
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                ex.getMessage() // 👈 show actual issue
+        );
     }
 
     private ResponseEntity<Map<String, Object>> buildErrorResponse(HttpStatus status, String message) {
@@ -38,6 +44,7 @@ public class GlobalExceptionHandler {
         body.put("status", status.value());
         body.put("error", status.getReasonPhrase());
         body.put("message", message);
+
         return new ResponseEntity<>(body, status);
     }
 }

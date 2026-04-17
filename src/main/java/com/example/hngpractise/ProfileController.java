@@ -5,6 +5,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api")
@@ -17,44 +19,84 @@ public class ProfileController {
     }
 
     @PostMapping("/profiles")
-    public ResponseEntity<?> createProfile(@RequestParam String name) {
-        if (name == null || name.trim().isEmpty() || !name.matches("[a-zA-Z]+")) {
+    public ResponseEntity<?> createProfile(@RequestBody ProfileRequest request) {
+
+        if (request == null || request.getName() == null ||
+                request.getName().trim().isEmpty() ||
+                !request.getName().matches("[a-zA-Z]+")) {
+
             return ResponseEntity.badRequest().body(
-                    Map.of("status", "error", "message", "Invalid name")
+                    Map.of(
+                            "status", "error",
+                            "message", "Invalid name"
+                    )
             );
         }
-        try {
-            Profile profile = profileService.createProfile(name);
-            return ResponseEntity.ok(Map.of("status", "success", "data", profile));
-        } catch (Exception e) {
-            return ResponseEntity.status(502).body(
-                    Map.of("status", "error", "message", "Failed to create profile")
-            );
-        }
+
+        Profile profile = profileService.createProfile(request.getName());
+
+        return ResponseEntity.status(201).body(
+                Map.of(
+                        "status", "success",
+                        "data", profile
+                )
+        );
+    }
+
+    @GetMapping("/profiles/{id}")
+    public ResponseEntity<?> getProfile(@PathVariable UUID id) {
+
+        Profile profile = profileService.getProfileById(id);
+
+        return ResponseEntity.ok(
+                Map.of(
+                        "status", "success",
+                        "data", profile
+                )
+        );
     }
 
     @GetMapping("/profiles")
-    public ResponseEntity<?> getAllProfiles() {
+    public ResponseEntity<?> getAllProfiles(
+            @RequestParam(required = false) String gender,
+            @RequestParam(required = false) String country_id,
+            @RequestParam(required = false) String age_group
+    ) {
+
         List<Profile> profiles = profileService.getAllProfiles();
-        return ResponseEntity.ok(Map.of("status", "success", "data", profiles));
-    }
 
-    @GetMapping("/profile-classify")
-    public ResponseEntity<?> classify(@RequestParam String name) {
-        if (name == null || name.trim().isEmpty() || !name.matches("[a-zA-Z]+")) {
-            return ResponseEntity.badRequest().body(
-                    Map.of("status", "error", "message", "Invalid name")
-            );
+        if (gender != null && !gender.isEmpty()) {
+            profiles = profiles.stream()
+                    .filter(p -> p.getGender() != null && p.getGender().equalsIgnoreCase(gender))
+                    .collect(Collectors.toList());
         }
 
-        try {
-            Profile profile = profileService.classifyProfile(name);
-            return ResponseEntity.ok(Map.of("status", "success", "data", profile));
-        } catch (Exception e) {
-            return ResponseEntity.status(502).body(
-                    Map.of("status", "error", "message", "Genderize returned an invalid response")
-            );
+        if (country_id != null && !country_id.isEmpty()) {
+            profiles = profiles.stream()
+                    .filter(p -> p.getCountryId() != null && p.getCountryId().equalsIgnoreCase(country_id))
+                    .collect(Collectors.toList());
         }
+
+        if (age_group != null && !age_group.isEmpty()) {
+            profiles = profiles.stream()
+                    .filter(p -> p.getAgeGroup() != null && p.getAgeGroup().equalsIgnoreCase(age_group))
+                    .collect(Collectors.toList());
+        }
+
+        return ResponseEntity.ok(
+                Map.of(
+                        "status", "success",
+                        "count", profiles.size(),
+                        "data", profiles
+                )
+        );
     }
 
+    @DeleteMapping("/profiles/{id}")
+    public ResponseEntity<?> deleteProfile(@PathVariable UUID id) {
+
+        profileService.deleteProfile(id);
+
+        return ResponseEntity.noContent().build();
+    }
 }
