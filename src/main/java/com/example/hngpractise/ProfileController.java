@@ -51,7 +51,7 @@ public class ProfileController {
             Profile profile = profileService.classifyProfile(name);
             return ResponseEntity.ok(Map.of("status", "success", "data", profile));
         } catch (Exception e) {
-            return ResponseEntity.status(502).body(
+            return ResponseEntity.status(500).body(
                     Map.of("status", "error", "message", "Genderize returned an invalid response")
             );
         }
