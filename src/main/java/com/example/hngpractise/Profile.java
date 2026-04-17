@@ -1,25 +1,43 @@
 package com.example.hngpractise;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 
 import java.time.Instant;
 import java.util.UUID;
 
 @Entity
+@Table(name = "profiles")
 public class Profile {
 
     @Id
     private UUID id;
+
+    @Column(nullable = false)
     private String name;
+
     private String gender;
+
     private Double genderProbability;
+
     private Integer sampleSize;
+
     private Integer age;
+
     private String ageGroup;
+
     private String countryId;
+
     private Double countryProbability;
+
+    @Column(nullable = false)
     private Instant createdAt;
+
+    // ✅ REQUIRED by JPA (VERY IMPORTANT)
+    public Profile() {
+    }
 
     // Getters and setters
     public UUID getId() {
