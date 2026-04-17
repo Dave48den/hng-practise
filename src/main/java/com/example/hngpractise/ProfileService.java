@@ -26,52 +26,15 @@ public class ProfileService {
     }
 
     public Profile createProfile(String name) {
-
-        // Idempotency (do not recreate duplicates)
+        // Idempotency
         Optional<Profile> existing = profileRepository.findByNameIgnoreCase(name);
         if (existing.isPresent()) {
             return existing.get();
         }
 
-        Profile profile = new Profile();
+        Profile profile = classifyProfile(name);
         profile.setId(UUID.randomUUID());
-        profile.setName(name);
-
-        // ALWAYS set timestamp (fixes ISO issue)
         profile.setCreatedAt(Instant.now());
-
-        // -------------------
-        // GENDERIZE
-        // -------------------
-        GenderizeResponse g = genderizeClient.classify(name);
-        profile.setGender(g != null && g.getGender() != null ? g.getGender() : "unknown");
-        profile.setGenderProbability(g != null ? g.getProbability() : 0.0);
-        profile.setSampleSize(g != null ? g.getCount() : 0);
-
-        // -------------------
-        // AGIFY
-        // -------------------
-        AgifyResponse a = agifyClient.classify(name);
-        int age = (a != null && a.getAge() != null) ? a.getAge() : 0;
-
-        profile.setAge(age);
-        profile.setAgeGroup(getAgeGroup(age));
-
-        // -------------------
-        // NATIONALIZE
-        // -------------------
-        NationalizeResponse n = nationalizeClient.classify(name);
-
-        if (n != null && n.getCountry() != null && !n.getCountry().isEmpty()) {
-            NationalizeResponse.Country top = n.getCountry().get(0);
-
-            profile.setCountryId(top.getCountry_id());
-            profile.setCountryProbability(top.getProbability());
-        } else {
-            profile.setCountryId("unknown");
-            profile.setCountryProbability(0.0);
-        }
-
         return profileRepository.save(profile);
     }
 
@@ -88,9 +51,44 @@ public class ProfileService {
         profileRepository.deleteById(id);
     }
 
-    // -------------------
-    // AGE GROUP FIX
-    // -------------------
+    public Profile classifyProfile(String name) {
+        Profile profile = new Profile();
+        profile.setName(name);
+
+        // -------------------
+        // GENDERIZE
+        // -------------------
+        GenderizeResponse g = genderizeClient.classify(name);
+        if (g == null || g.getGender() == null || g.getCount() == 0) {
+            throw new ExternalApiException("Genderize returned an invalid response");
+        }
+        profile.setGender(g.getGender());
+        profile.setGenderProbability(g.getProbability());
+        profile.setSampleSize(g.getCount());
+
+        // -------------------
+        // AGIFY
+        // -------------------
+        AgifyResponse a = agifyClient.classify(name);
+        if (a == null || a.getAge() == null) {
+            throw new ExternalApiException("Agify returned an invalid response");
+        }
+        profile.setAge(a.getAge());
+        profile.setAgeGroup(getAgeGroup(a.getAge()));
+
+        // -------------------
+        // NATIONALIZE
+        // -------------------
+        NationalizeResponse n = nationalizeClient.classify(name);
+        if (n == null || n.getTopCountry() == null) {
+            throw new ExternalApiException("Nationalize returned an invalid response");
+        }
+        profile.setCountryId(n.getTopCountry().getCountry_id());
+        profile.setCountryProbability(n.getTopCountry().getProbability());
+
+        return profile;
+    }
+
     private String getAgeGroup(int age) {
         if (age <= 12) return "child";
         if (age <= 19) return "teenager";

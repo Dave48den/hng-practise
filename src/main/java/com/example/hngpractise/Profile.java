@@ -1,5 +1,6 @@
 package com.example.hngpractise;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -33,9 +34,10 @@ public class Profile {
     private Double countryProbability;
 
     @Column(nullable = false)
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss'Z'", timezone = "UTC")
     private Instant createdAt;
 
-    // ✅ REQUIRED by JPA (VERY IMPORTANT)
+    // ✅ REQUIRED by JPA
     public Profile() {
     }
 
