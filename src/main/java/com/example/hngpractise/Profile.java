@@ -1,6 +1,7 @@
 package com.example.hngpractise;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -10,7 +11,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "profiles")
+@Table(name = "profile")
 public class Profile {
 
     @Id
@@ -21,19 +22,25 @@ public class Profile {
 
     private String gender;
 
+    @JsonProperty("gender_probability")
     private Double genderProbability;
 
+    @JsonProperty("sample_size")
     private Integer sampleSize;
 
     private Integer age;
 
+    @JsonProperty("age_group")
     private String ageGroup;
 
+    @JsonProperty("country_id")
     private String countryId;
 
+    @JsonProperty("country_probability")
     private Double countryProbability;
 
     @Column(nullable = false)
+    @JsonProperty("created_at")
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss'Z'", timezone = "UTC")
     private Instant createdAt;
 
@@ -42,6 +49,7 @@ public class Profile {
     }
 
     // Getters and setters
+
     public UUID getId() {
         return id;
     }

@@ -1,9 +1,14 @@
 package com.example.hngpractise;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+import java.util.Comparator;
 import java.util.List;
 
 public class NationalizeResponse {
+
     private String name;
+
     private List<Country> country;
 
     public String getName() {
@@ -22,23 +27,29 @@ public class NationalizeResponse {
         this.country = country;
     }
 
+    // ✅ Safely get the country with the highest probability
     public Country getTopCountry() {
         if (country == null || country.isEmpty()) return null;
+
         return country.stream()
-                .max((c1, c2) -> Double.compare(c1.getProbability(), c2.getProbability()))
+                .filter(c -> c.getProbability() != null)
+                .max(Comparator.comparing(Country::getProbability))
                 .orElse(null);
     }
 
     public static class Country {
-        private String country_id;
+
+        @JsonProperty("country_id")
+        private String countryId;
+
         private Double probability;
 
-        public String getCountry_id() {
-            return country_id;
+        public String getCountryId() {
+            return countryId;
         }
 
-        public void setCountry_id(String country_id) {
-            this.country_id = country_id;
+        public void setCountryId(String countryId) {
+            this.countryId = countryId;
         }
 
         public Double getProbability() {

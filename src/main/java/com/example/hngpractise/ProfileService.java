@@ -26,7 +26,15 @@ public class ProfileService {
     }
 
     public Profile createProfile(String name) {
-        // Idempotency
+
+        // ✅ Validate + normalize input (important for idempotency tests)
+        if (name == null || name.trim().isEmpty()) {
+            throw new IllegalArgumentException("Name cannot be empty");
+        }
+
+        name = name.trim();
+
+        // ✅ Idempotency check
         Optional<Profile> existing = profileRepository.findByNameIgnoreCase(name);
         if (existing.isPresent()) {
             return existing.get();
@@ -35,6 +43,7 @@ public class ProfileService {
         Profile profile = classifyProfile(name);
         profile.setId(UUID.randomUUID());
         profile.setCreatedAt(Instant.now());
+
         return profileRepository.save(profile);
     }
 
@@ -52,6 +61,7 @@ public class ProfileService {
     }
 
     public Profile classifyProfile(String name) {
+
         Profile profile = new Profile();
         profile.setName(name);
 
@@ -59,9 +69,10 @@ public class ProfileService {
         // GENDERIZE
         // -------------------
         GenderizeResponse g = genderizeClient.classify(name);
-        if (g == null || g.getGender() == null || g.getCount() == 0) {
+        if (g == null || g.getGender() == null || g.getCount() == 0 || g.getProbability() == null) {
             throw new ExternalApiException("Genderize returned an invalid response");
         }
+
         profile.setGender(g.getGender());
         profile.setGenderProbability(g.getProbability());
         profile.setSampleSize(g.getCount());
@@ -73,6 +84,7 @@ public class ProfileService {
         if (a == null || a.getAge() == null) {
             throw new ExternalApiException("Agify returned an invalid response");
         }
+
         profile.setAge(a.getAge());
         profile.setAgeGroup(getAgeGroup(a.getAge()));
 
@@ -80,11 +92,17 @@ public class ProfileService {
         // NATIONALIZE
         // -------------------
         NationalizeResponse n = nationalizeClient.classify(name);
-        if (n == null || n.getTopCountry() == null) {
+        if (n == null) {
             throw new ExternalApiException("Nationalize returned an invalid response");
         }
-        profile.setCountryId(n.getTopCountry().getCountry_id());
-        profile.setCountryProbability(n.getTopCountry().getProbability());
+
+        NationalizeResponse.Country topCountry = n.getTopCountry();
+        if (topCountry == null) {
+            throw new ExternalApiException("No country data available");
+        }
+
+        profile.setCountryId(topCountry.getCountryId());
+        profile.setCountryProbability(topCountry.getProbability());
 
         return profile;
     }
