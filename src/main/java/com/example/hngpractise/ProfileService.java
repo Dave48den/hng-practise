@@ -1,9 +1,9 @@
 package com.example.hngpractise;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
-import java.time.Instant;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -25,16 +25,17 @@ public class ProfileService {
         this.nationalizeClient = nationalizeClient;
     }
 
+    // =============================
+    // CREATE PROFILE
+    // =============================
     public Profile createProfile(String name) {
 
-        // ✅ Validate + normalize input (important for idempotency tests)
         if (name == null || name.trim().isEmpty()) {
             throw new IllegalArgumentException("Name cannot be empty");
         }
 
         name = name.trim();
 
-        // ✅ Idempotency check
         Optional<Profile> existing = profileRepository.findByNameIgnoreCase(name);
         if (existing.isPresent()) {
             return existing.get();
@@ -42,44 +43,70 @@ public class ProfileService {
 
         Profile profile = classifyProfile(name);
         profile.setId(UUID.randomUUID());
-        profile.setCreatedAt(Instant.now());
 
         return profileRepository.save(profile);
     }
 
-    public List<Profile> getAllProfiles() {
-        return profileRepository.findAll();
+    // =============================
+    // 🔥 STAGE 2 CORE: FILTER + PAGINATION + SORTING
+    // =============================
+    public Page<Profile> searchProfiles(
+            String gender,
+            String ageGroup,
+            String countryId,
+            Integer minAge,
+            Integer maxAge,
+            Double minGenderProbability,
+            Double minCountryProbability,
+            Pageable pageable
+    ) {
+        return profileRepository.findAll(
+                ProfileSpecification.filter(
+                        gender,
+                        ageGroup,
+                        countryId,
+                        minAge,
+                        maxAge,
+                        minGenderProbability,
+                        minCountryProbability
+                ),
+                pageable
+        );
     }
 
+    // =============================
+    // GET BY ID
+    // =============================
     public Profile getProfileById(UUID id) {
         return profileRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Profile not found"));
     }
 
+    // =============================
+    // DELETE
+    // =============================
     public void deleteProfile(UUID id) {
         profileRepository.deleteById(id);
     }
 
+    // =============================
+    // CLASSIFICATION LOGIC
+    // =============================
     public Profile classifyProfile(String name) {
 
         Profile profile = new Profile();
         profile.setName(name);
 
-        // -------------------
-        // GENDERIZE
-        // -------------------
+        // -------- GENDERIZE --------
         GenderizeResponse g = genderizeClient.classify(name);
-        if (g == null || g.getGender() == null || g.getCount() == 0 || g.getProbability() == null) {
+        if (g == null || g.getGender() == null || g.getProbability() == null) {
             throw new ExternalApiException("Genderize returned an invalid response");
         }
 
         profile.setGender(g.getGender());
         profile.setGenderProbability(g.getProbability());
-        profile.setSampleSize(g.getCount());
 
-        // -------------------
-        // AGIFY
-        // -------------------
+        // -------- AGIFY --------
         AgifyResponse a = agifyClient.classify(name);
         if (a == null || a.getAge() == null) {
             throw new ExternalApiException("Agify returned an invalid response");
@@ -88,9 +115,7 @@ public class ProfileService {
         profile.setAge(a.getAge());
         profile.setAgeGroup(getAgeGroup(a.getAge()));
 
-        // -------------------
-        // NATIONALIZE
-        // -------------------
+        // -------- NATIONALIZE --------
         NationalizeResponse n = nationalizeClient.classify(name);
         if (n == null) {
             throw new ExternalApiException("Nationalize returned an invalid response");
@@ -103,6 +128,11 @@ public class ProfileService {
 
         profile.setCountryId(topCountry.getCountryId());
         profile.setCountryProbability(topCountry.getProbability());
+
+        String countryId = topCountry.getCountryId();
+        String countryName = CountryUtil.getCountryName(countryId);
+
+        profile.setCountryName(countryName);
 
         return profile;
     }

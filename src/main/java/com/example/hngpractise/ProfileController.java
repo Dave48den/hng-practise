@@ -1,15 +1,16 @@
 package com.example.hngpractise;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.Map;
-import java.util.UUID;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api")
+@CrossOrigin(origins = "*")
 public class ProfileController {
 
     private final ProfileService profileService;
@@ -18,85 +19,89 @@ public class ProfileController {
         this.profileService = profileService;
     }
 
-    @PostMapping("/profiles")
-    public ResponseEntity<?> createProfile(@RequestBody ProfileRequest request) {
+    // ✅ STAGE 2 MAIN ENDPOINT (FILTER + SORT + PAGINATION)
+    @GetMapping("/profiles")
+    public ResponseEntity<?> getProfiles(
+            @RequestParam(required = false) String gender,
+            @RequestParam(required = false) String age_group,
+            @RequestParam(required = false) String country_id,
+            @RequestParam(required = false) Integer min_age,
+            @RequestParam(required = false) Integer max_age,
+            @RequestParam(required = false) Double min_gender_probability,
+            @RequestParam(required = false) Double min_country_probability,
+            @RequestParam(defaultValue = "createdAt") String sort_by,
+            @RequestParam(defaultValue = "desc") String order,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int limit
+    ) {
 
-        if (request == null || request.getName() == null ||
-                request.getName().trim().isEmpty() ||
-                !request.getName().matches("[a-zA-Z]+")) {
-
+        if (limit > 50) {
             return ResponseEntity.badRequest().body(
-                    Map.of(
-                            "status", "error",
-                            "message", "Invalid name"
-                    )
+                    Map.of("status", "error", "message", "Invalid query parameters")
             );
         }
 
-        Profile profile = profileService.createProfile(request.getName());
+        Sort sort = order.equalsIgnoreCase("desc")
+                ? Sort.by(sort_by).descending()
+                : Sort.by(sort_by).ascending();
 
-        return ResponseEntity.status(201).body(
-                Map.of(
-                        "status", "success",
-                        "data", profile
-                )
+        PageRequest pageable = PageRequest.of(page - 1, limit, sort);
+
+        Page<Profile> result = profileService.searchProfiles(
+                gender, age_group, country_id,
+                min_age, max_age,
+                min_gender_probability, min_country_probability,
+                pageable
         );
-    }
-
-    @GetMapping("/profiles/{id}")
-    public ResponseEntity<?> getProfile(@PathVariable UUID id) {
-
-        Profile profile = profileService.getProfileById(id);
 
         return ResponseEntity.ok(
                 Map.of(
                         "status", "success",
-                        "data", profile
+                        "page", page,
+                        "limit", limit,
+                        "total", result.getTotalElements(),
+                        "data", result.getContent()
                 )
         );
     }
 
-    @GetMapping("/profiles")
-    public ResponseEntity<?> getAllProfiles(
-            @RequestParam(required = false) String gender,
-            @RequestParam(required = false) String country_id,
-            @RequestParam(required = false) String age_group
+    // 🔥 NATURAL LANGUAGE SEARCH ENDPOINT
+    @GetMapping("/profiles/search")
+    public ResponseEntity<?> searchProfilesNatural(
+            @RequestParam String q,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int limit
     ) {
 
-        List<Profile> profiles = profileService.getAllProfiles();
+        var filters = QueryParser.parse(q);
 
-        if (gender != null && !gender.isEmpty()) {
-            profiles = profiles.stream()
-                    .filter(p -> p.getGender() != null && p.getGender().equalsIgnoreCase(gender))
-                    .collect(Collectors.toList());
+        if (filters.isEmpty()) {
+            return ResponseEntity.badRequest().body(
+                    Map.of("status", "error", "message", "Unable to interpret query")
+            );
         }
 
-        if (country_id != null && !country_id.isEmpty()) {
-            profiles = profiles.stream()
-                    .filter(p -> p.getCountryId() != null && p.getCountryId().equalsIgnoreCase(country_id))
-                    .collect(Collectors.toList());
-        }
+        PageRequest pageable = PageRequest.of(page - 1, limit);
 
-        if (age_group != null && !age_group.isEmpty()) {
-            profiles = profiles.stream()
-                    .filter(p -> p.getAgeGroup() != null && p.getAgeGroup().equalsIgnoreCase(age_group))
-                    .collect(Collectors.toList());
-        }
+        Page<Profile> result = profileService.searchProfiles(
+                (String) filters.get("gender"),
+                (String) filters.get("age_group"),
+                (String) filters.get("country_id"),
+                (Integer) filters.get("min_age"),
+                (Integer) filters.get("max_age"),
+                null,
+                null,
+                pageable
+        );
 
         return ResponseEntity.ok(
                 Map.of(
                         "status", "success",
-                        "count", profiles.size(),
-                        "data", profiles
+                        "page", page,
+                        "limit", limit,
+                        "total", result.getTotalElements(),
+                        "data", result.getContent()
                 )
         );
-    }
-
-    @DeleteMapping("/profiles/{id}")
-    public ResponseEntity<?> deleteProfile(@PathVariable UUID id) {
-
-        profileService.deleteProfile(id);
-
-        return ResponseEntity.noContent().build();
     }
 }

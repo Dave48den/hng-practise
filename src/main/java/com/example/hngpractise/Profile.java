@@ -6,45 +6,52 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "profile")
+@Table(name = "profiles")
 public class Profile {
 
     @Id
     private UUID id;
 
-    @Column(nullable = false)
+    @Column(nullable = false, unique = true)
     private String name;
 
     private String gender;
 
+    @Column(name = "gender_probability")
     @JsonProperty("gender_probability")
     private Double genderProbability;
 
-    @JsonProperty("sample_size")
-    private Integer sampleSize;
-
     private Integer age;
 
+    @Column(name = "age_group")
     @JsonProperty("age_group")
     private String ageGroup;
 
+    @Column(name = "country_id", length = 2)
     @JsonProperty("country_id")
     private String countryId;
 
+    @Column(name = "country_name")
+    @JsonProperty("country_name")
+    private String countryName;
+
+    @Column(name = "country_probability")
     @JsonProperty("country_probability")
     private Double countryProbability;
 
-    @Column(nullable = false)
+    @CreationTimestamp
+    @Column(name = "created_at", updatable = false, nullable = false)
     @JsonProperty("created_at")
-    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss'Z'", timezone = "UTC")
+    @JsonFormat(shape = JsonFormat.Shape.STRING)
     private Instant createdAt;
 
-    // ✅ REQUIRED by JPA
+    // Required by JPA
     public Profile() {
     }
 
@@ -82,14 +89,6 @@ public class Profile {
         this.genderProbability = genderProbability;
     }
 
-    public Integer getSampleSize() {
-        return sampleSize;
-    }
-
-    public void setSampleSize(Integer sampleSize) {
-        this.sampleSize = sampleSize;
-    }
-
     public Integer getAge() {
         return age;
     }
@@ -114,6 +113,14 @@ public class Profile {
         this.countryId = countryId;
     }
 
+    public String getCountryName() {
+        return countryName;
+    }
+
+    public void setCountryName(String countryName) {
+        this.countryName = countryName;
+    }
+
     public Double getCountryProbability() {
         return countryProbability;
     }
@@ -124,9 +131,5 @@ public class Profile {
 
     public Instant getCreatedAt() {
         return createdAt;
-    }
-
-    public void setCreatedAt(Instant createdAt) {
-        this.createdAt = createdAt;
     }
 }
