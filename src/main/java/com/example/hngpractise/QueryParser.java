@@ -16,12 +16,14 @@ public class QueryParser {
         // =========================
         // GENDER PARSING
         // =========================
-        if (query.contains("male")) {
+        if (query.contains("male") && query.contains("female")) {
+            filters.put("gender", "both"); // handle both genders
+        } else if (query.contains("male")) {
             filters.put("gender", "male");
-        }
-        if (query.contains("female")) {
+        } else if (query.contains("female")) {
             filters.put("gender", "female");
         }
+
 
         // =========================
         // AGE GROUP / RANGE LOGIC
@@ -35,9 +37,10 @@ public class QueryParser {
             filters.put("max_age", 19);
         }
         if (query.contains("adult")) {
-            filters.put("min_age", 18);   // ✅ FIX: start at 18 not 20
+            filters.put("min_age", 20);   // start at 18
             filters.put("max_age", 59);
         }
+
         if (query.contains("senior") || query.contains("old")) {
             filters.put("min_age", 60);
             filters.put("max_age", 120);
@@ -48,7 +51,7 @@ public class QueryParser {
         // =========================
         if (query.contains("above")) {
             filters.put("min_age", extractNumber(query, "above", 17));
-            filters.remove("max_age"); // ✅ ensure no conflicting max_age
+            filters.remove("max_age"); // ensure no conflicting max_age
         }
         if (query.contains("below")) {
             filters.put("max_age", extractNumber(query, "below", 18));
