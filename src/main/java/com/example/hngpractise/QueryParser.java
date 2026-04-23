@@ -6,13 +6,11 @@ import java.util.Map;
 public class QueryParser {
 
     public static Map<String, Object> parse(String query) {
-
         if (query == null || query.trim().isEmpty()) {
             return null;
         }
 
         query = query.toLowerCase();
-
         Map<String, Object> filters = new HashMap<>();
 
         // =========================
@@ -21,7 +19,6 @@ public class QueryParser {
         if (query.contains("male")) {
             filters.put("gender", "male");
         }
-
         if (query.contains("female")) {
             filters.put("gender", "female");
         }
@@ -29,26 +26,18 @@ public class QueryParser {
         // =========================
         // AGE GROUP / RANGE LOGIC
         // =========================
-
-        // CHILD / YOUNG
         if (query.contains("young") || query.contains("child")) {
             filters.put("min_age", 0);
             filters.put("max_age", 17);
         }
-
-        // TEENAGERS
         if (query.contains("teen")) {
             filters.put("min_age", 13);
             filters.put("max_age", 19);
         }
-
-        // ADULT
         if (query.contains("adult")) {
-            filters.put("min_age", 20);
+            filters.put("min_age", 18);   // ✅ FIX: start at 18 not 20
             filters.put("max_age", 59);
         }
-
-        // SENIOR
         if (query.contains("senior") || query.contains("old")) {
             filters.put("min_age", 60);
             filters.put("max_age", 120);
@@ -57,13 +46,10 @@ public class QueryParser {
         // =========================
         // AGE CONDITIONS
         // =========================
-
-        // "above 17"
         if (query.contains("above")) {
             filters.put("min_age", extractNumber(query, "above", 17));
+            filters.remove("max_age"); // ✅ ensure no conflicting max_age
         }
-
-        // "below 18"
         if (query.contains("below")) {
             filters.put("max_age", extractNumber(query, "below", 18));
         }
@@ -74,15 +60,12 @@ public class QueryParser {
         if (query.contains("ghana")) {
             filters.put("country_id", "GH");
         }
-
         if (query.contains("nigeria")) {
             filters.put("country_id", "NG");
         }
-
         if (query.contains("kenya")) {
             filters.put("country_id", "KE");
         }
-
         if (query.contains("united states") || query.contains("usa")) {
             filters.put("country_id", "US");
         }
