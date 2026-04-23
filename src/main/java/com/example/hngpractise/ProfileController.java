@@ -119,7 +119,7 @@ public class ProfileController {
                         "limit", safeLimit,
                         "total", result.getTotalElements(),
                         "pages", result.getTotalPages(),
-                        "results", result.getContent()
+                        "data", result.getContent()
 
                 )
         );

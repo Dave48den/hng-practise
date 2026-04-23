@@ -29,17 +29,25 @@ public class QueryParser {
         // AGE GROUP / RANGE LOGIC
         // =========================
         if (query.contains("young") || query.contains("child")) {
-            filters.put("min_age", 0);
-            filters.put("max_age", 17);
+            filters.put("min_age", 16);
+            filters.put("max_age", 24);
         }
         if (query.contains("teen")) {
+            filters.put("age_group", "teenager");
             filters.put("min_age", 13);
             filters.put("max_age", 19);
         }
+        if (query.contains("above")) {
+            filters.put("min_age", extractNumber(query, "above", 17));
+            filters.remove("max_age"); // override
+        }
+
         if (query.contains("adult")) {
-            filters.put("min_age", 20);   // start at 18
+            filters.put("age_group", "adult");
+            filters.put("min_age", 18);
             filters.put("max_age", 59);
         }
+
 
         if (query.contains("senior") || query.contains("old")) {
             filters.put("min_age", 60);
