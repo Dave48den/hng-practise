@@ -4,6 +4,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
+import java.nio.ByteBuffer;
+import java.security.SecureRandom;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -14,6 +16,7 @@ public class ProfileService {
     private final GenderizeClient genderizeClient;
     private final AgifyClient agifyClient;
     private final NationalizeClient nationalizeClient;
+    private final SecureRandom random = new SecureRandom();
 
     public ProfileService(ProfileRepository profileRepository,
                           GenderizeClient genderizeClient,
@@ -25,11 +28,26 @@ public class ProfileService {
         this.nationalizeClient = nationalizeClient;
     }
 
+    // ==========================================
+    // UUID V7 GENERATOR (Requirement: UUID v7)
+    // ==========================================
+    public UUID generateUUIDv7() {
+        byte[] value = new byte[16];
+        random.nextBytes(value);
+        long timestamp = System.currentTimeMillis();
+        ByteBuffer buf = ByteBuffer.allocate(8);
+        buf.putLong(timestamp);
+        System.arraycopy(buf.array(), 2, value, 0, 6);
+        value[6] = (byte) ((value[6] & 0x0F) | 0x70); // Set version to 7
+        value[8] = (byte) ((value[8] & 0x3F) | 0x80); // Set variant to 1
+        ByteBuffer result = ByteBuffer.wrap(value);
+        return new UUID(result.getLong(), result.getLong());
+    }
+
     // =============================
     // CREATE PROFILE
     // =============================
     public Profile createProfile(String name) {
-
         if (name == null || name.trim().isEmpty()) {
             throw new IllegalArgumentException("Name cannot be empty");
         }
@@ -42,13 +60,15 @@ public class ProfileService {
         }
 
         Profile profile = classifyProfile(name);
-        profile.setId(UUID.randomUUID());
+
+        // 🔥 FIX: Using the new UUID v7 generator instead of randomUUID()
+        profile.setId(generateUUIDv7());
 
         return profileRepository.save(profile);
     }
 
     // =============================
-    // 🔥 STAGE 2 CORE: FILTER + PAGINATION + SORTING
+    // STAGE 2 CORE: FILTER + PAGINATION + SORTING
     // =============================
     public Page<Profile> searchProfiles(
             String gender,
@@ -93,7 +113,6 @@ public class ProfileService {
     // CLASSIFICATION LOGIC
     // =============================
     public Profile classifyProfile(String name) {
-
         Profile profile = new Profile();
         profile.setName(name);
 
@@ -102,7 +121,6 @@ public class ProfileService {
         if (g == null || g.getGender() == null || g.getProbability() == null) {
             throw new ExternalApiException("Genderize returned an invalid response");
         }
-
         profile.setGender(g.getGender());
         profile.setGenderProbability(g.getProbability());
 
@@ -111,7 +129,6 @@ public class ProfileService {
         if (a == null || a.getAge() == null) {
             throw new ExternalApiException("Agify returned an invalid response");
         }
-
         profile.setAge(a.getAge());
         profile.setAgeGroup(getAgeGroup(a.getAge()));
 
@@ -131,7 +148,6 @@ public class ProfileService {
 
         String countryId = topCountry.getCountryId();
         String countryName = CountryUtil.getCountryName(countryId);
-
         profile.setCountryName(countryName);
 
         return profile;

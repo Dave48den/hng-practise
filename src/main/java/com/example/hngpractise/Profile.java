@@ -48,15 +48,18 @@ public class Profile {
     @CreationTimestamp
     @Column(name = "created_at", updatable = false, nullable = false)
     @JsonProperty("created_at")
-    @JsonFormat(shape = JsonFormat.Shape.STRING)
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss'Z'", timezone = "UTC")
     private Instant createdAt;
 
-    // Required by JPA
     public Profile() {
     }
 
-    // Getters and setters
+    // Add this setter so the seeder or JPA doesn't complain
+    public void setCreatedAt(Instant createdAt) {
+        this.createdAt = createdAt;
+    }
 
+    // ... Keep all your existing getters and setters below ...
     public UUID getId() {
         return id;
     }

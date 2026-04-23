@@ -6,22 +6,21 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/api")
 @CrossOrigin(origins = "*")
 public class ProfileController {
-
     private final ProfileService profileService;
+    private final List<String> ALLOWED_SORT_FIELDS = Arrays.asList("age", "created_at", "gender_probability", "name");
 
     public ProfileController(ProfileService profileService) {
         this.profileService = profileService;
     }
 
-    // =============================
-    // STAGE 2: FILTER + SORT + PAGINATION
-    // =============================
     @GetMapping("/profiles")
     public ResponseEntity<?> getProfiles(
             @RequestParam(required = false) String gender,
@@ -31,58 +30,36 @@ public class ProfileController {
             @RequestParam(required = false) Integer max_age,
             @RequestParam(required = false) Double min_gender_probability,
             @RequestParam(required = false) Double min_country_probability,
-            @RequestParam(defaultValue = "name") String sort_by,
+            @RequestParam(defaultValue = "created_at") String sort_by,
             @RequestParam(defaultValue = "desc") String order,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int limit
     ) {
-        int safeLimit = Math.min(limit, 50);
-
-        // ✅ Map grader’s JSON field names to entity fields
-        switch (sort_by) {
-            case "created_at":
-                sort_by = "createdAt";
-                break;
-            case "gender_probability":
-                sort_by = "genderProbability";
-                break;
-            case "country_name":
-                sort_by = "countryName";
-                break;
-            case "age_group":
-                sort_by = "ageGroup";
-                break;
-            default:
-                break; // keep as is
+        // VALIDATION: Prevent 500 error on invalid sort field
+        if (!ALLOWED_SORT_FIELDS.contains(sort_by)) {
+            return ResponseEntity.status(400).body(Map.of("status", "error", "message", "Invalid query parameters"));
         }
 
-        Sort sort = order.equalsIgnoreCase("desc")
-                ? Sort.by(sort_by).descending()
-                : Sort.by(sort_by).ascending();
+        // Map camelCase for JPA
+        String mappedSort = sort_by;
+        if (sort_by.equals("created_at")) mappedSort = "createdAt";
+        if (sort_by.equals("gender_probability")) mappedSort = "genderProbability";
 
+        int safeLimit = Math.min(limit, 50);
+        Sort sort = order.equalsIgnoreCase("desc") ? Sort.by(mappedSort).descending() : Sort.by(mappedSort).ascending();
         PageRequest pageable = PageRequest.of(page - 1, safeLimit, sort);
 
-        Page<Profile> result = profileService.searchProfiles(
-                gender, age_group, country_id,
-                min_age, max_age,
-                min_gender_probability, min_country_probability,
-                pageable
-        );
+        Page<Profile> result = profileService.searchProfiles(gender, age_group, country_id, min_age, max_age, min_gender_probability, min_country_probability, pageable);
 
-        return ResponseEntity.ok(
-                Map.of(
-                        "status", "success",
-                        "page", page,
-                        "limit", safeLimit,
-                        "total", result.getTotalElements(),
-                        "data", result.getContent()
-                )
-        );
+        return ResponseEntity.ok(Map.of(
+                "status", "success",
+                "page", page,
+                "limit", safeLimit,
+                "total", result.getTotalElements(),
+                "data", result.getContent()
+        ));
     }
 
-    // =============================
-    // NATURAL LANGUAGE SEARCH
-    // =============================
     @GetMapping("/profiles/search")
     public ResponseEntity<?> searchProfilesNatural(
             @RequestParam String q,
@@ -90,11 +67,8 @@ public class ProfileController {
             @RequestParam(defaultValue = "10") int limit
     ) {
         var filters = QueryParser.parse(q);
-
         if (filters == null) {
-            return ResponseEntity.badRequest().body(
-                    Map.of("status", "error", "message", "Unable to interpret query")
-            );
+            return ResponseEntity.status(400).body(Map.of("status", "error", "message", "Unable to interpret query"));
         }
 
         int safeLimit = Math.min(limit, 50);
@@ -106,20 +80,15 @@ public class ProfileController {
                 (String) filters.get("country_id"),
                 (Integer) filters.get("min_age"),
                 (Integer) filters.get("max_age"),
-                null,
-                null,
-                pageable
+                null, null, pageable
         );
 
-        return ResponseEntity.ok(
-                Map.of(
-                        "status", "success",
-                        "page", page,
-                        "limit", safeLimit,
-                        "total", result.getTotalElements(),
-                        "data", result.getContent()
-
-                )
-        );
+        return ResponseEntity.ok(Map.of(
+                "status", "success",
+                "page", page,
+                "limit", safeLimit,
+                "total", result.getTotalElements(),
+                "data", result.getContent()
+        ));
     }
 }
