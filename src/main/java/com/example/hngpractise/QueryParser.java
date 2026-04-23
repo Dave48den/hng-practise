@@ -24,22 +24,24 @@ public class QueryParser {
             filters.put("gender", "female");
         }
 
-
         // =========================
         // AGE GROUP / RANGE LOGIC
         // =========================
-        if (query.contains("young") || query.contains("child")) {
+        if (query.contains("child")) {
+            filters.put("age_group", "child");
+            filters.put("min_age", 0);
+            filters.put("max_age", 12);
+        }
+
+        if (query.contains("young")) {
             filters.put("min_age", 16);
             filters.put("max_age", 24);
         }
+
         if (query.contains("teen")) {
             filters.put("age_group", "teenager");
             filters.put("min_age", 13);
             filters.put("max_age", 19);
-        }
-        if (query.contains("above")) {
-            filters.put("min_age", extractNumber(query, "above", 17));
-            filters.remove("max_age"); // override
         }
 
         if (query.contains("adult")) {
@@ -48,8 +50,8 @@ public class QueryParser {
             filters.put("max_age", 59);
         }
 
-
         if (query.contains("senior") || query.contains("old")) {
+            filters.put("age_group", "senior");
             filters.put("min_age", 60);
             filters.put("max_age", 120);
         }
@@ -59,8 +61,15 @@ public class QueryParser {
         // =========================
         if (query.contains("above")) {
             filters.put("min_age", extractNumber(query, "above", 17));
-            filters.remove("max_age"); // ensure no conflicting max_age
+            filters.remove("max_age"); // override
+            if (query.contains("teen")) {
+                filters.put("age_group", "teenager"); // keep age_group
+            }
+            if (query.contains("adult")) {
+                filters.put("age_group", "adult"); // keep age_group
+            }
         }
+
         if (query.contains("below")) {
             filters.put("max_age", extractNumber(query, "below", 18));
         }
@@ -77,6 +86,9 @@ public class QueryParser {
         if (query.contains("kenya")) {
             filters.put("country_id", "KE");
         }
+        if (query.contains("angola")) {
+            filters.put("country_id", "AO");
+        }
         if (query.contains("united states") || query.contains("usa")) {
             filters.put("country_id", "US");
         }
@@ -84,10 +96,7 @@ public class QueryParser {
         // =========================
         // FINAL VALIDATION
         // =========================
-        if (filters.isEmpty()) {
-            return null;
-        }
-
+        // Always return filters, even if only one condition matched
         return filters;
     }
 

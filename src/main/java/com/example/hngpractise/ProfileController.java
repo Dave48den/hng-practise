@@ -75,7 +75,6 @@ public class ProfileController {
                         "page", page,
                         "limit", safeLimit,
                         "total", result.getTotalElements(),
-                        "pages", result.getTotalPages(),   // ✅ FIX: pagination envelope
                         "data", result.getContent()
                 )
         );
@@ -118,7 +117,6 @@ public class ProfileController {
                         "page", page,
                         "limit", safeLimit,
                         "total", result.getTotalElements(),
-                        "pages", result.getTotalPages(),
                         "data", result.getContent()
 
                 )
