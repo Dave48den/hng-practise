@@ -7,4 +7,5 @@ import com.example.hngpractise.User; // Force the correct User
 
 public interface UserRepository extends JpaRepository<User, UUID> {
     Optional<User> findByGithubId(String githubId);
+    Optional<User> findByUsername(String username);
 }

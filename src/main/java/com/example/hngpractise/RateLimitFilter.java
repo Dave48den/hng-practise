@@ -30,8 +30,7 @@ public class RateLimitFilter implements Filter {
         String clientIp = httpRequest.getRemoteAddr();
         String path = httpRequest.getRequestURI();
 
-        // Define limits: Auth = 10/min, Others = 60/min
-        int limit = path.startsWith("/auth") ? 10 : 60;
+        int limit = path.startsWith("/auth") ? 200 : 500;
 
         requestCounts.putIfAbsent(clientIp, new AtomicInteger(0));
         int currentCount = requestCounts.get(clientIp).incrementAndGet();
