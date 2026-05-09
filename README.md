@@ -1,108 +1,43 @@
-# Backend Wizards Stage 2 API
-
-##  Overview
-This project is a Spring Boot REST API that processes user names, enriches them using external APIs (Genderize, Agify, Nationalize), stores results in a database, and provides advanced search capabilities including filtering, pagination, sorting, and natural language query parsing.
-
----
-
-##  Features
-
-- Name classification using external APIs
-- Gender prediction (Genderize API)
-- Age prediction (Agify API)
-- Nationality prediction (Nationalize API)
-- Data persistence using database
-- Advanced filtering system
-- Pagination with limit enforcement (max 50)
-- Sorting by multiple fields
-- Natural language query parsing (e.g. "young males from kenya")
-
----
-
-##  Base URL
-https://hng-practise-production.up.railway.app
-
----
-
-##  API Endpoints
-
-### 1. Create Profile
-**POST** `/api/classify`
-
-Request:
-{
-  "name": "John"
-}
-
-Response:
-{
-  "id": "uuid",
-  "name": "John",
-  "gender": "male",
-  "genderProbability": 0.91,
-  "age": 24,
-  "ageGroup": "adult",
-  "countryName": "Ghana",
-  "countryProbability": 0.87
-}
-
----
-
-### 2. Get Profiles (Filtering + Pagination + Sorting)
-**GET** `/api/profiles`
-
-Query Params:
-- gender
-- age_group
-- country_id
-- min_age
-- max_age
-- min_gender_probability
-- min_country_probability
-- sort_by
-- order
-- page
-- limit (max 50)
-
-Example:
-/api/profiles?gender=male&sort_by=name&order=asc&page=1&limit=10
-
----
-
-### 3. Natural Language Search
-**GET** `/api/profiles/search`
-
-Examples:
-/api/profiles/search?q=young males
-/api/profiles/search?q=adult females from ghana
-/api/profiles/search?q=teenagers above 17
-
----
-
-##  Query Interpretation
-
-| Input | Meaning |
-|------|--------|
-| young males | age 0–17 + male |
-| adult females from kenya | age 20–59 + female + KE |
-| teenagers above 17 | age ≥ 17 |
-
----
-
-##  Tech Stack
-
-- Java 17+
-- Spring Boot
-- Spring Data JPA
-- PostgreSQL / MySQL
-- REST APIs
-
----
-
-##  Deployment
-https://hng-practise-production.up.railway.app
-
----
-
-## 👨‍💻 Author
-Backend Wizards Stage 2 Submission
+Backend Wizards Stage 2 API
+Overview
+This API provides advanced demographic data management for Insighta Labs. It supports high-performance filtering, sorting, and a custom rule-based Natural Language Processing (NLP) engine to query profiles using plain English.
+API Endpoints
+1. Get All Profiles
+GET /api/profiles
+Supports combined filters, pagination, and sorting.
+Filters: gender, age_group, country_id, min_age, max_age, min_gender_probability, min_country_probability.
+Sorting: sort_by (age, created_at, gender_probability), order (asc, desc).
+Pagination: page (default 1), limit (default 10, max 50).
+2. Natural Language Query
+GET /api/profiles/search?q={query}
+Parses plain English into structured database filters.
+Natural Language Parsing Approach
+Our parser uses a rule-based Regex engine (no LLMs) to map keywords to database filters:
+Keyword Mapping:
+Gender: Detects male or female.
+Age Groups: Detects child, teenager, adult, or senior.
+Age-Specific: "Young" is strictly mapped to the 16–24 age range as per requirements.
+Comparison Logic:
+Uses Regex to identify the words above, over, below, or under followed by a number.
+above/over → Sets min_age.
+below/under → Sets max_age.
+Location Logic:
+Detects country names (e.g., "Kenya", "Nigeria") and maps them to ISO codes (KE, NG) using a predefined dictionary.
+Combination Logic:
+Keywords are additive. For example, "young males from nigeria" combines gender=male, min_age=16, max_age=24, and country_id=NG.
+Query Example	Internal Mapping
+"young males"	gender: male, min_age: 16, max_age: 24
+"females above 30"	gender: female, min_age: 30
+"adult males from kenya"	gender: male, age_group: adult, country_id: KE
+"teenagers above 17"	age_group: teenager, min_age: 17
+Limitations
+The current parser is built for speed and specific business rules but has the following limitations:
+No Complex Conjunctions: Does not support OR or AND NOT logic (e.g., "males but not from Kenya").
+Single Country Only: Can only parse one country per query.
+Specific Phrasing: Comparison logic requires standard phrasing like "above [number]". Slang or unusual sentence structures may result in an "Unable to interpret query" error.
+Fixed Thresholds: The definition of "young" is hardcoded to 16–24 and does not adapt to different cultural contexts.
+Tech Stack
+Language: Java 21
+Framework: Spring Boot 3.3.5
+Database: PostgreSQL (with UUID v7 primary keys)
+Deployment: Railway
