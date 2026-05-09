@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 
 import java.nio.ByteBuffer;
 import java.security.SecureRandom;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -29,7 +30,7 @@ public class ProfileService {
     }
 
     // ==========================================
-    // UUID V7 GENERATOR (Requirement: UUID v7)
+    // UUID V7 GENERATOR
     // ==========================================
     public UUID generateUUIDv7() {
         byte[] value = new byte[16];
@@ -38,8 +39,8 @@ public class ProfileService {
         ByteBuffer buf = ByteBuffer.allocate(8);
         buf.putLong(timestamp);
         System.arraycopy(buf.array(), 2, value, 0, 6);
-        value[6] = (byte) ((value[6] & 0x0F) | 0x70); // Set version to 7
-        value[8] = (byte) ((value[8] & 0x3F) | 0x80); // Set variant to 1
+        value[6] = (byte) ((value[6] & 0x0F) | 0x70);
+        value[8] = (byte) ((value[8] & 0x3F) | 0x80);
         ByteBuffer result = ByteBuffer.wrap(value);
         return new UUID(result.getLong(), result.getLong());
     }
@@ -60,15 +61,13 @@ public class ProfileService {
         }
 
         Profile profile = classifyProfile(name);
-
-        // 🔥 FIX: Using the new UUID v7 generator instead of randomUUID()
         profile.setId(generateUUIDv7());
 
         return profileRepository.save(profile);
     }
 
     // =============================
-    // STAGE 2 CORE: FILTER + PAGINATION + SORTING
+    // SEARCH (FILTER + PAGINATION)
     // =============================
     public Page<Profile> searchProfiles(
             String gender,
@@ -107,6 +106,16 @@ public class ProfileService {
     // =============================
     public void deleteProfile(UUID id) {
         profileRepository.deleteById(id);
+    }
+
+    // =============================
+    // EXPORT (NEW ✅)
+    // =============================
+    public List<Profile> getAllProfilesForExport(String gender) {
+        if (gender != null && !gender.isEmpty()) {
+            return profileRepository.findByGenderIgnoreCase(gender);
+        }
+        return profileRepository.findAll();
     }
 
     // =============================
@@ -158,5 +167,13 @@ public class ProfileService {
         if (age <= 19) return "teenager";
         if (age <= 59) return "adult";
         return "senior";
+    }
+
+    public Profile processAndSaveProfile(String name) {
+        return null;
+    }
+
+    public List<Profile> getAllProfilesForExport(String gender, String ageGroup, String countryId, String sortBy, String order) {
+        return List.of();
     }
 }

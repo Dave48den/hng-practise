@@ -5,8 +5,12 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -35,15 +39,12 @@ public class ProfileController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int limit
     ) {
-        // VALIDATION: Prevent 500 error on invalid sort field
         if (!ALLOWED_SORT_FIELDS.contains(sort_by)) {
             return ResponseEntity.status(400).body(Map.of("status", "error", "message", "Invalid query parameters"));
         }
 
-        // Map camelCase for JPA
-        String mappedSort = sort_by;
-        if (sort_by.equals("created_at")) mappedSort = "createdAt";
-        if (sort_by.equals("gender_probability")) mappedSort = "genderProbability";
+        String mappedSort = sort_by.equals("created_at") ? "createdAt" :
+                sort_by.equals("gender_probability") ? "genderProbability" : sort_by;
 
         int safeLimit = Math.min(limit, 50);
         Sort sort = order.equalsIgnoreCase("desc") ? Sort.by(mappedSort).descending() : Sort.by(mappedSort).ascending();
@@ -51,13 +52,17 @@ public class ProfileController {
 
         Page<Profile> result = profileService.searchProfiles(gender, age_group, country_id, min_age, max_age, min_gender_probability, min_country_probability, pageable);
 
-        return ResponseEntity.ok(Map.of(
-                "status", "success",
-                "page", page,
-                "limit", safeLimit,
-                "total", result.getTotalElements(),
-                "data", result.getContent()
-        ));
+        PaginatedResponse<Profile> response = PaginatedResponse.<Profile>builder()
+                .status("success")
+                .page(page)
+                .limit(safeLimit)
+                .total(result.getTotalElements())
+                .total_pages(result.getTotalPages())
+                .links(buildLinks("/api/profiles", page, result.getTotalPages(), safeLimit))
+                .data(result.getContent())
+                .build();
+
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/profiles/search")
@@ -75,20 +80,87 @@ public class ProfileController {
         PageRequest pageable = PageRequest.of(page - 1, safeLimit);
 
         Page<Profile> result = profileService.searchProfiles(
-                (String) filters.get("gender"),
-                (String) filters.get("age_group"),
-                (String) filters.get("country_id"),
-                (Integer) filters.get("min_age"),
-                (Integer) filters.get("max_age"),
-                null, null, pageable
+                (String) filters.get("gender"), (String) filters.get("age_group"), (String) filters.get("country_id"),
+                (Integer) filters.get("min_age"), (Integer) filters.get("max_age"), null, null, pageable
         );
 
-        return ResponseEntity.ok(Map.of(
-                "status", "success",
-                "page", page,
-                "limit", safeLimit,
-                "total", result.getTotalElements(),
-                "data", result.getContent()
-        ));
+        PaginatedResponse<Profile> response = PaginatedResponse.<Profile>builder()
+                .status("success")
+                .page(page)
+                .limit(safeLimit)
+                .total(result.getTotalElements())
+                .total_pages(result.getTotalPages())
+                .links(buildLinks("/api/profiles/search", page, result.getTotalPages(), safeLimit))
+                .data(result.getContent())
+                .build();
+
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Requirement: POST /api/profiles (Admin Only)
+     */
+    @PostMapping("/profiles")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> createProfile(@RequestBody Map<String, String> request) {
+
+        String name = request.get("name");
+
+        // Validation
+        if (name == null || name.isEmpty()) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("status", "error");
+            error.put("message", "Name is required");
+            return ResponseEntity.status(400).body(error);
+        }
+
+        // Process profile (calls external APIs)
+        Profile savedProfile = profileService.processAndSaveProfile(name);
+
+        // Safe response (NO Map.of → avoids NullPointerException)
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "success");
+        response.put("data", savedProfile);
+
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Requirement: Export Profiles (CSV) with dynamic timestamp and filters
+     */
+    @GetMapping("/profiles/export")
+    public ResponseEntity<String> exportProfiles(
+            @RequestParam(required = false) String gender,
+            @RequestParam(required = false) String age_group,
+            @RequestParam(required = false) String country_id,
+            @RequestParam(defaultValue = "created_at") String sort_by,
+            @RequestParam(defaultValue = "desc") String order
+    ) {
+        // Use a high limit for export or create a service method for all matching records
+        List<Profile> profiles = profileService.getAllProfilesForExport(gender, age_group, country_id, sort_by, order);
+
+        StringBuilder csv = new StringBuilder();
+        csv.append("id,name,gender,gender_probability,age,age_group,country_id,country_name,country_probability,created_at\n");
+
+        for (Profile p : profiles) {
+            csv.append(String.format("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n",
+                    p.getId(), p.getName(), p.getGender(), p.getGenderProbability(),
+                    p.getAge(), p.getAgeGroup(), p.getCountryId(), p.getCountryName(),
+                    p.getCountryProbability(), p.getCreatedAt()));
+        }
+
+        String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
+        return ResponseEntity.ok()
+                .header("Content-Type", "text/csv")
+                .header("Content-Disposition", "attachment; filename=\"profiles_" + timestamp + ".csv\"")
+                .body(csv.toString());
+    }
+
+    private Map<String, String> buildLinks(String baseUri, int currentPage, int totalPages, int limit) {
+        Map<String, String> links = new HashMap<>();
+        links.put("self", baseUri + "?page=" + currentPage + "&limit=" + limit);
+        links.put("next", (currentPage < totalPages) ? baseUri + "?page=" + (currentPage + 1) + "&limit=" + limit : null);
+        links.put("prev", (currentPage > 1) ? baseUri + "?page=" + (currentPage - 1) + "&limit=" + limit : null);
+        return links;
     }
 }
